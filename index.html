@@ -143,30 +143,36 @@
             diceBtn.disabled = true;
             
             const totalStations = stations.length;
-            let actualStepsTaken = 0;
+            const remaining = (totalStations - 1) - position; // ゴールまでの残りマス
 
             for (let i = 0; i < steps; i++) {
+                // 小岩（最後）に到達したらそこでストップ
                 if (position >= totalStations - 1) break;
+                
                 position++;
-                actualStepsTaken++;
                 updateMarker();
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
 
-            // ★ぴったりゴールの判定演出
+            // --- ゴール後の演出判定 ---
             if (position === totalStations - 1) {
-                if (actualStepsTaken === steps) {
-                    // ぴったりゴールの豪華演出！
-                    var duration = 3 * 1000;
+                if (steps === remaining) {
+                    // 【超豪華】残りマスとサイコロの目が「ぴったり」だった時！
+                    var duration = 4 * 1000;
                     var end = Date.now() + duration;
                     (function frame() {
-                      confetti({ particleCount: 7, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#FFD700', '#FFA500'] });
-                      confetti({ particleCount: 7, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#FFD700', '#FFA500'] });
+                      confetti({ particleCount: 10, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#FFD700', '#FFA500', '#FF4500'] });
+                      confetti({ particleCount: 10, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#FFD700', '#FFA500', '#FF4500'] });
                       if (Date.now() < end) { requestAnimationFrame(frame); }
                     }());
                 } else {
-                    // 普通のゴール
-                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                    // 【通常ゴール】勢い余ってゴールした時
+                    confetti({ 
+                        particleCount: 150, 
+                        spread: 70, 
+                        origin: { y: 0.6 },
+                        colors: ['#87CEEB', '#ffffff', '#FFD700'] 
+                    });
                 }
             }
             
