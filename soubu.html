@@ -1,0 +1,42 @@
+// --- 修正版のJavaScript（サイコロと電車の画像部分） ---
+
+// 1. マーカー（電車）の画像指定
+// HTML内の <div id="marker"> の中の <img> タグ
+// <img id="trainImg" src="soubu.png" alt="🚃">
+
+// 2. サイコロを振るアニメーション部分
+diceBtn.addEventListener("click", () => {
+    diceBtn.disabled = true;
+    let count = 0;
+    const roll = setInterval(() => {
+        // シャッフル中も指定の名前に
+        diceImg.src = `sugo_0${Math.floor(Math.random() * 6) + 1}.jpg`;
+        count++;
+        if (count > 12) {
+            clearInterval(roll);
+            const dice = Math.floor(Math.random() * 6) + 1;
+            // 決定した出目の画像を表示
+            diceImg.src = `sugo_0${dice}.jpg`;
+
+            const oldPos = position;
+            position = (position + dice) % stations.length;
+
+            let passedStart = false;
+            for (let i = 1; i <= dice; i++) {
+                if ((oldPos + i) % stations.length === startPosition) {
+                    passedStart = true;
+                    break;
+                }
+            }
+
+            if (passedStart) {
+                fireConfetti();
+            }
+
+            setTimeout(() => {
+                saveAndMove();
+                diceBtn.disabled = false;
+            }, 300);
+        }
+    }, 80);
+});
