@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>総武線すごろく | 旅情アニメ版</title>
+    <title>総武線すごろく | ぴったりゴール演出版</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         body {
@@ -15,7 +15,6 @@
             -webkit-tap-highlight-color: transparent;
         }
 
-        /* メニューを横いっぱいに広げてサイコロを強調 */
         #menu-container {
             background: rgba(255,255,255,0.9);
             margin-bottom: 10px; padding: 15px;
@@ -24,7 +23,6 @@
         }
 
         #dice-box { display: flex; flex-direction: column; align-items: center; }
-        /* サイコロを大きくしたよ！ */
         #diceImg { width: 80px; height: 80px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); margin-bottom: 8px; }
         
         #controls { text-align: left; font-size: 0.9rem; line-height: 1.6; }
@@ -58,14 +56,20 @@
 
         #marker {
             position: absolute; width: 18%; height: auto;
-            /* 1駅ずつの動きを滑らかにする設定 */
             transition: all 0.5s ease-in-out;
             z-index: 100; pointer-events: none;
         }
         #trainImg { width: 100%; height: auto; }
 
-        .cloud { position: fixed; background: #fff; border-radius: 50px; opacity: 0.6; z-index: -1; animation: moveClouds linear infinite; }
-        @keyframes moveClouds { from { transform: translateX(-150px); } to { transform: translateX(110vw); } }
+        /* 雲を復活させたよ！ */
+        .cloud {
+            position: fixed; background: #fff; border-radius: 50px;
+            opacity: 0.8; z-index: -1; animation: moveClouds linear infinite;
+        }
+        @keyframes moveClouds {
+            from { transform: translateX(-200px); }
+            to { transform: translateX(110vw); }
+        }
     </style>
 </head>
 <body>
@@ -95,7 +99,7 @@
         
         let position = parseInt(localStorage.getItem("sobu_pos")) || 0;
         let startPosition = parseInt(localStorage.getItem("sobu_start")) || 0;
-        let isMoving = false; // アニメーション中かどうかのフラグ
+        let isMoving = false;
 
         const stationElements = [];
         stations.forEach((name, i) => {
@@ -118,7 +122,6 @@
             select.appendChild(opt);
         });
 
-        // レール描画
         for (let i = 0; i < stationElements.length - 1; i++) {
             const s1 = stationElements[i];
             const s2 = stationElements[i+1];
@@ -135,20 +138,36 @@
             board.appendChild(line);
         }
 
-        // 移動処理
         async function moveOneByOne(steps) {
             isMoving = true;
             diceBtn.disabled = true;
             
+            const totalStations = stations.length;
+            let actualStepsTaken = 0;
+
             for (let i = 0; i < steps; i++) {
-                if (position >= stations.length - 1) break;
+                if (position >= totalStations - 1) break;
                 position++;
+                actualStepsTaken++;
                 updateMarker();
-                await new Promise(resolve => setTimeout(resolve, 500)); // 0.5秒おきに次へ
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
 
-            if (position === stations.length - 1) {
-                confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } });
+            // ★ぴったりゴールの判定演出
+            if (position === totalStations - 1) {
+                if (actualStepsTaken === steps) {
+                    // ぴったりゴールの豪華演出！
+                    var duration = 3 * 1000;
+                    var end = Date.now() + duration;
+                    (function frame() {
+                      confetti({ particleCount: 7, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#FFD700', '#FFA500'] });
+                      confetti({ particleCount: 7, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#FFD700', '#FFA500'] });
+                      if (Date.now() < end) { requestAnimationFrame(frame); }
+                    }());
+                } else {
+                    // 普通のゴール
+                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                }
             }
             
             localStorage.setItem("sobu_pos", position);
@@ -201,15 +220,18 @@
             }, 80);
         });
 
-        // 雲
-        for (let i = 0; i < 5; i++) {
+        // 雲の生成を確実に実行
+        const cloudsContainer = document.getElementById("cloudsContainer");
+        for (let i = 0; i < 6; i++) {
             const c = document.createElement("div");
             c.className = "cloud";
-            c.style.width = (Math.random()*80+60)+"px"; c.style.height = (Math.random()*20+20)+"px";
-            c.style.top = (Math.random()*20)+"vh"; c.style.left = "-150px";
-            c.style.animationDuration = (Math.random()*20+20)+"s";
-            c.style.animationDelay = (Math.random()*10)+"s";
-            document.getElementById("cloudsContainer").appendChild(c);
+            c.style.width = (Math.random()*120+80)+"px";
+            c.style.height = (Math.random()*40+30)+"px";
+            c.style.top = (Math.random()*40)+"vh";
+            c.style.left = "-200px";
+            c.style.animationDuration = (Math.random()*25+15)+"s";
+            c.style.animationDelay = (Math.random()*20)+"s";
+            cloudsContainer.appendChild(c);
         }
 
         updateMarker();
