@@ -1,26 +1,239 @@
-// --- 修正版のJavaScript（サイコロと電車の画像部分） ---
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>総武線すごろく | S字レイアウト</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 10px;
+            overflow-x: hidden;
+            /* 案A：さわやかな青空のグラデーション */
+            background: linear-gradient(to bottom, #87CEEB, #E0F7FA);
+            color: #333;
+            min-height: 100vh;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-// 1. マーカー（電車）の画像指定
-// HTML内の <div id="marker"> の中の <img> タグ
-// <img id="trainImg" src="soubu.png" alt="🚃">
+        /* 雲のアニメーション */
+        .cloud {
+            position: fixed;
+            background: #fff;
+            border-radius: 50px;
+            opacity: 0.8;
+            z-index: -1;
+            animation: moveClouds linear infinite;
+        }
+        @keyframes moveClouds {
+            from { transform: translateX(-150px); }
+            to { transform: translateX(110vw); }
+        }
 
-// 2. サイコロを振るアニメーション部分
+        h1 { margin: 10px 0; font-size: 1.3rem; color: #005CAF; text-shadow: 1px 1px 2px white; }
+        
+        #settings {
+            margin-bottom: 10px;
+            background: rgba(255,255,255,0.6);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        #board-container {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            /* S字で縦に長くなるのでaspect-ratioは調整 */
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        #board {
+            width: 100%;
+            height: 600px; /* S字用に高さを確保 */
+            position: relative;
+            background: rgba(255, 255, 255, 0.3);
+            border: 3px solid #FFD700; /* 総武線イエロー */
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .station {
+            position: absolute;
+            width: 20%; /* 4列想定 */
+            height: 50px;
+            font-size: clamp(9px, 2.5vw, 12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            color: #333;
+            border-radius: 8px;
+            font-weight: bold;
+            box-sizing: border-box;
+            border: 2px solid #FFD700;
+            z-index: 10;
+            transition: all 0.3s;
+        }
+
+        .current-station {
+            background: #FFD700 !important;
+            color: #000 !important;
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+            z-index: 11;
+        }
+
+        #marker {
+            position: absolute;
+            width: 12%;
+            height: 40px;
+            transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 100;
+        }
+        #trainImg { width: 100%; height: 100%; object-fit: contain; }
+
+        #dice-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 50;
+            background: rgba(255,255,255,0.8);
+            padding: 15px;
+            border-radius: 15px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        #diceImg { width: 50px; height: 50px; display: block; margin: 0 auto 10px; }
+        #diceBtn {
+            padding: 8px 16px;
+            background: #FFD700;
+            color: #333;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 3px #b89b00;
+        }
+        #diceBtn:disabled { background: #ccc; box-shadow: none; }
+    </style>
+</head>
+<body>
+    <div id="cloudsContainer"></div>
+    <h1>総武線すごろく | 各駅停車の旅</h1>
+
+    <div id="settings">
+        出発駅を選択：
+        <select id="startStationSelect"></select>
+        <p style="margin: 5px 0 0 0;">いま：<span id="currentStation">西荻窪</span></p>
+    </div>
+
+    <div id="board-container">
+        <div id="board">
+            <div id="dice-container">
+                <img id="diceImg" src="dice1.png" alt="🎲">
+                <button id="diceBtn">サイコロを振る</button>
+            </div>
+            <div id="marker"><img id="trainImg" src="soubu.png" alt="🚃"></div>
+        </div>
+    </div>
+
+    <script>
+        const stations = [
+            "西荻窪", "荻窪", "阿佐ヶ谷", "高円寺", "中野", 
+            "東中野", "大久保", "新宿", "代々木", "千駄ヶ谷", 
+            "信濃町", "四ツ谷", "市ヶ谷", "飯田橋", "水道橋", 
+            "御茶ノ水", "秋葉原", "浅草橋", "両国", "錦糸町", 
+            "亀戸", "平井", "新小岩", "小岩"
+        ];
+
+        const board = document.getElementById("board");
+        const select = document.getElementById("startStationSelect");
+        
+        let position = parseInt(localStorage.getItem("sobu_pos")) || 0;
+        let startPosition = parseInt(localStorage.getItem("sobu_start")) || 0;
+
+        // S字レイアウトで駅を配置
+        stations.forEach((name, i) => {
+            const div = document.createElement("div");
+            div.className = "station";
+            div.textContent = name;
+            
+            const cols = 4; // 1行に4駅
+            const row = Math.floor(i / cols);
+            const col = i % cols;
+            
+            let left;
+            if (row % 2 === 0) {
+                left = 5 + (col * 23); // 左から右へ
+            } else {
+                left = 5 + ((cols - 1 - col) * 23); // 右から左へ（S字）
+            }
+            const top = 5 + (row * 75); // 行の間隔
+
+            div.style.left = left + "%";
+            div.style.top = top + "px";
+            board.appendChild(div);
+
+            const opt = document.createElement("option");
+            opt.value = i;
+            opt.textContent = name;
+            if (i === startPosition) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        select.addEventListener("change", (e) => {
+            startPosition = parseInt(e.target.value);
+            position = startPosition;
+            localStorage.setItem("sobu_start", startPosition);
+            saveAndMove();
+        });
+
+        function saveAndMove() {
+            localStorage.setItem("sobu_pos", position);
+            const marker = document.getElementById("marker");
+            const stationDivs = document.querySelectorAll(".station");
+            const target = stationDivs[position];
+            
+            document.getElementById("currentStation").textContent = stations[position];
+            stationDivs.forEach(d => d.classList.remove("current-station"));
+            target.classList.add("current-station");
+
+            marker.style.left = (parseFloat(target.style.left) + 4) + "%";
+            marker.style.top = (parseFloat(target.style.top) + 5) + "px";
+        }
+
+       // --- ここから入れ替え ---
+const diceBtn = document.getElementById("diceBtn");
+const diceImg = document.getElementById("diceImg");
+
 diceBtn.addEventListener("click", () => {
     diceBtn.disabled = true;
     let count = 0;
+    
     const roll = setInterval(() => {
-        // シャッフル中も指定の名前に
+        // ★修正点：サイコロを振っている最中の画像（シャッフル）
         diceImg.src = `sugo_0${Math.floor(Math.random() * 6) + 1}.jpg`;
         count++;
+        
         if (count > 12) {
             clearInterval(roll);
             const dice = Math.floor(Math.random() * 6) + 1;
-            // 決定した出目の画像を表示
+            
+            // ★修正点：止まった時の画像を表示
             diceImg.src = `sugo_0${dice}.jpg`;
 
             const oldPos = position;
+            // 移動（総武線の駅数に合わせてループ）
             position = (position + dice) % stations.length;
 
+            // 始発を越えたらクラッカー
             let passedStart = false;
             for (let i = 1; i <= dice; i++) {
                 if ((oldPos + i) % stations.length === startPosition) {
@@ -30,7 +243,12 @@ diceBtn.addEventListener("click", () => {
             }
 
             if (passedStart) {
-                fireConfetti();
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#FFD700', '#ffffff', '#87CEEB'] 
+                });
             }
 
             setTimeout(() => {
@@ -40,3 +258,23 @@ diceBtn.addEventListener("click", () => {
         }
     }, 80);
 });
+// --- ここまで入れ替え ---
+
+        // 雲を生成
+        const cloudsContainer = document.getElementById("cloudsContainer");
+        for (let i = 0; i < 5; i++) {
+            const cloud = document.createElement("div");
+            cloud.className = "cloud";
+            cloud.style.width = (Math.random() * 100 + 100) + "px";
+            cloud.style.height = (Math.random() * 30 + 40) + "px";
+            cloud.style.top = (Math.random() * 40) + "vh";
+            cloud.style.left = "-150px";
+            cloud.style.animationDuration = (Math.random() * 20 + 20) + "s";
+            cloud.style.animationDelay = (Math.random() * 20) + "s";
+            cloudsContainer.appendChild(cloud);
+        }
+
+        saveAndMove();
+    </script>
+</body>
+</html>
